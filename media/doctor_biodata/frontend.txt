@@ -1,0 +1,32 @@
+npm create vite@latest newform
+Framework → React
+
+Variant → JavaScript
+
+Install now? → No
+cd newform
+
+
+npm install --force
+npm install patch-package --save-dev
+npm install
+npm run dev
+app.css,index.css all delete
+
+python.exe manage.py runserver 192.168.1.44:8000 the server should run
+foxl yxzc abwh otpn
+backend
+python -m venv venv
+
+cd env
+cd scripts
+activate
+python -m pip install Django
+django-admin startproject login
+cd login
+python manage.py startapp newlogin
+python manage.py runserver
+C:\Users\ANEESH\Downloads\ngrok-v3-stable-windows-amd64 (1)
+cd C:\Users\ANEESH\Desktop\spokenback\login
+C:/Users/ANEESH/Desktop/spokenback/env/Scripts/python.exe manage.py runserver 192.168.1.44:8000
+https://github.com/Ajoyjoseph325/test_collab
