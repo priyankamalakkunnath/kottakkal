@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'newlogin',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
 ]
 
@@ -123,3 +125,48 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# When frontend runs on another host/port (e.g. Vite), set this so image URLs point to this server.
+# Example: PUBLIC_MEDIA_BASE_URL = 'http://127.0.0.1:8000'
+# Leave empty to use the request host (works when frontend proxies /api and /media to this server).
+PUBLIC_MEDIA_BASE_URL = os.environ.get('PUBLIC_MEDIA_BASE_URL', 'http://127.0.0.1:8000')
+
+# CORS settings (for frontend API access)
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins in development
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Email (SMTP) – for registration credentials
+# Env vars EMAIL_HOST_USER, EMAIL_HOST_PASSWORD override the defaults below.
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'priyankamalakkunnath@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'foxlyxzcabwhotpn')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@example.com')
+
+# SMS (optional). Set SMS_GATEWAY_URL to enable. Example for MSG91-style GET:
+# https://api.msg91.com/api/sendhttp.php?authkey=KEY&mobiles=PH&message=MSG&sender=SND
+# Use placeholders: {phone}, {message}
+SMS_GATEWAY_URL = ''  # e.g. 'https://your-sms-gateway.com/send?to={phone}&text={message}'
+SMS_GATEWAY_METHOD = 'GET'  # or 'POST'
+SMS_API_KEY = ''  # If your gateway needs an auth key in URL/body

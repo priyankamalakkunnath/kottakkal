@@ -247,163 +247,1323 @@ Example: Create Branch (JSON)
   }
 
 
-Medicine API (Django REST Framework)
+Medical Item API (REST – parent medical_items + child medical_item_media)
 
 Base URL
   /api/
 
 Endpoints
-  GET    /api/medicines/               List medicines
-  POST   /api/medicines/               Create medicine
-  GET    /api/medicines/{id}/          Retrieve medicine
-  PUT    /api/medicines/{id}/          Update medicine (full)
-  PATCH  /api/medicines/{id}/          Update medicine (partial)
-  DELETE /api/medicines/{id}/          Delete medicine
+  GET    /api/medicalitems/            List all medical items (with media, LEFT JOIN)
+  POST   /api/medicalitems/            Create medical item + media in one request (transaction)
+  GET    /api/medicalitems/{id}/       Get medical item by id (with media)
+  PUT    /api/medicalitems/{id}/       Update medical item (full)
+  PATCH  /api/medicalitems/{id}/       Update medical item (partial)
+  DELETE /api/medicalitems/{id}/       Delete medical item (cascade deletes media)
 
-Model Fields (Medicine)
-  medicine_code  (string, read-only; auto-generated when creating, format: MEDyymmddXXXX)
-  name           (string, required)
-  unit           (string, required)
-  location1      (string, optional)
-  location2      (string, optional)
-  description    (text, optional)
-  dosage         (string, optional)
-  ingredients    (text, optional)
-  status         (string, optional; choices: in stock, out of stock; default: in stock)
-  hsn_code       (string, optional)
-  reorder_level  (integer, optional; default: 0)
-  media          (nested object, optional; child table with img1, img2, img3, img4, video)
+Parent table: medical_items
+  id                 (read-only, auto)
+  mcode              (string, read-only; natural number sequence "1", "2", "3", ...)
+  sku_name           (string, required)
+  sku_code           (string, required, unique)
+  unit               (string, required)
+  unit_prefix        (string, optional)
+  prefix_qty         (integer, optional)
+  catcode            (string, optional; Category.catcode value, e.g. "3")
+  package_count      (integer, optional; default 1)
+  reorder_level      (integer, optional; default 0)
+  mrp                (decimal, optional)
+  sell_discount      (decimal, optional)
+  storage_location1  (string, optional)
+  storage_location2  (string, optional)
+  hsn_code           (string, optional)
+  description        (text, optional)
+  dosage_instructions (text, optional)
+  basic_prize        (decimal, optional)
+  gst                (decimal, optional; GST percentage)
+  created_at         (read-only)
+  updated_at         (read-only)
 
-Child Table (MedicineMedia - nested in medicine)
-  img1   (file, optional)
-  img2   (file, optional)
-  img3   (file, optional)
-  img4   (file, optional)
-  video  (file, optional)
+Child table: medical_item_media (returned as "media" in response)
+  img1       (string/path, optional)
+  img2       (string/path, optional)
+  img3       (string/path, optional)
+  img4       (string/path, optional)
+  video_url  (string/path, optional)
 
-Notes (medicine creation)
-  - medicine_code is auto-generated in format MEDyymmddXXXX (e.g. MED2502141234)
-  - Use multipart/form-data when including media files (img1, img2, img3, img4, video)
+POST /api/medicalitems/ – single request body
+  Accepts all medical item fields plus img1, img2, img3, img4, video_url.
+  Uses a database transaction: inserts into medical_items, then into medical_item_media with medical_item_id.
+  On any failure, transaction is rolled back.
+  Returns full medical item object including id, mcode, and media. mcode is generated in the backend.
+
+Example: Create Medical Item (POST)
+  POST /api/medicalitems/
+  Content-Type: application/json
+
+  {
+    "sku_name": "Paracetamol",
+    "sku_code": "PCM500",
+    "unit": "tablet",
+    "unit_prefix": "strip",
+    "prefix_qty": 10,
+    "catcode": "3",
+    "package_count": 1,
+    "reorder_level": 20,
+    "mrp": 50.00,
+    "sell_discount": 5.00,
+    "storage_location1": "Rack A",
+    "storage_location2": "Shelf 2",
+    "hsn_code": "3004",
+    "description": "Pain relief medicine",
+    "dosage_instructions": "Twice daily after food",
+    "basic_prize": 40.00,
+    "gst": 12.50,
+    "img1": "/uploads/med_img1.jpg",
+    "img2": "/uploads/med_img2.jpg",
+    "img3": null,
+    "img4": null,
+    "video_url": "/uploads/med_video.mp4"
+  }
+
+GET /api/medicalitems/ and GET /api/medicalitems/{id}/ – response shape
+  Medical items are joined with medical_item_media (LEFT JOIN). If no media row, media is null.
+
+  {
+    "id": 1,
+    "mcode": "1",
+    "sku_name": "Paracetamol",
+    "sku_code": "PCM500",
+    "unit": "tablet",
+    "unit_prefix": "strip",
+    "prefix_qty": 10,
+    "catcode": "3",
+    "package_count": 1,
+    "reorder_level": 20,
+    "mrp": "50.00",
+    "sell_discount": "5.00",
+    "storage_location1": "Rack A",
+    "storage_location2": "Shelf 2",
+    "hsn_code": "3004",
+    "description": "Pain relief medicine",
+    "dosage_instructions": "Twice daily after food",
+    "basic_prize": "40.00",
+    "gst": "12.50",
+    "created_at": "2026-02-22T12:00:00Z",
+    "updated_at": "2026-02-22T12:00:00Z",
+    "media": {
+      "img1": "/uploads/med_img1.jpg",
+      "img2": "/uploads/med_img2.jpg",
+      "img3": null,
+      "img4": null,
+      "video_url": "/uploads/med_video.mp4"
+    }
+  }
+
+Update (PUT/PATCH) and Delete (DELETE)
+  PUT /api/medicalitems/{id}/  – full update; send all medical item fields and optionally img1–video_url.
+  PATCH /api/medicalitems/{id}/ – partial update; send only fields to change (including any media fields).
+  DELETE /api/medicalitems/{id}/ – deletes medical item and its media row (cascade).
+
+
+Category API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoints
+  GET    /api/categories/              List categories
+  GET    /api/categories/catcodes/    List all category id and catcode (lightweight)
+  POST   /api/categories/              Create category
+  GET    /api/categories/{id}/         Retrieve category
+  PUT    /api/categories/{id}/         Update category (full)
+  PATCH  /api/categories/{id}/         Update category (partial)
+  DELETE /api/categories/{id}/         Delete category
+
+Model Fields
+  catcode     (string, read-only; auto-generated when creating, format: CATyymmddXXXX)
+  name        (string, required)
+  description (text, optional)
+  image       (file, optional)
+
+GET /api/categories/catcodes/
+  Returns a JSON array of { id, catcode } for every category. Useful for dropdowns or listing all catcodes.
+  Example response: [ {"id": 1, "catcode": "1"}, {"id": 2, "catcode": "3"} ]
+
+Notes (image upload)
+  - Use multipart/form-data for requests that include the image file.
   - In DEBUG mode, uploaded files are served at: /media/<path>
 
-Example: Create Medicine (JSON, without media)
-  POST /api/medicines/
+Example: Create Category (JSON, without image)
+  POST /api/categories/
   Content-Type: application/json
 
   {
-    "name": "Paracetamol 500mg",
-    "unit": "Tablet",
-    "location1": "Shelf A1",
-    "location2": "Row 2",
-    "description": "Pain relief and fever reducer",
-    "dosage": "1 tablet every 6 hours",
-    "ingredients": "Paracetamol 500mg",
-    "status": "in stock",
-    "hsn_code": "3004",
-    "reorder_level": 20
+    "name": "Pain Relief",
+    "description": "Medicines for pain and fever"
   }
 
-Example: Create Medicine (JSON, with empty media)
-  POST /api/medicines/
-  Content-Type: application/json
-
-  {
-    "name": "Paracetamol 500mg",
-    "unit": "Tablet",
-    "location1": "Shelf A1",
-    "location2": "Row 2",
-    "description": "Pain relief and fever reducer",
-    "dosage": "1 tablet every 6 hours",
-    "ingredients": "Paracetamol 500mg",
-    "status": "in stock",
-    "hsn_code": "3004",
-    "reorder_level": 20,
-    "media": {}
-  }
-
-Example: Create Medicine (multipart, with images and video)
-  POST /api/medicines/
+Example: Create Category (multipart, with image)
+  POST /api/categories/
   Content-Type: multipart/form-data
 
-  name: Paracetamol 500mg
-  unit: Tablet
-  location1: Shelf A1
-  location2: Row 2
-  description: Pain relief and fever reducer
-  dosage: 1 tablet every 6 hours
-  ingredients: Paracetamol 500mg
-  status: in stock
-  hsn_code: 3004
-  reorder_level: 20
-  media[img1]: <select file>
-  media[img2]: <select file>
-  media[img3]: <select file>
-  media[img4]: <select file>
-  media[video]: <select file>
+  name: Pain Relief
+  description: Medicines for pain and fever
+  image: <select file>
 
 
-Purchase Bill API (Django REST Framework)
+Medicines by Category API
+
+Base URL
+  /api/
+
+Endpoint
+  GET  /api/categories/{id}/medicines/    List all medicines for the given category
+
+  {id} is the category primary key (integer). Returns a JSON array of medicine objects.
+
+Response (200 OK)
+  Array of medicine objects. Each object includes:
+  id, medicine_code, sku_name, sku_code, unit, unit_prefix, prefix_qty, catcode,
+  package_count, reorder_level, mrp, sell_discount, location1, location2, hsn_code,
+  description, dosage, ingredients, status, media (nested object with img1, img2, img3, img4, video as full URLs, or null if no media row).
+
+Example request
+  GET /api/categories/3/medicines/
+
+Example response
+  [
+    {
+      "id": 1,
+      "medicine_code": "MED2602271234",
+      "sku_name": "Paracetamol 500",
+      "sku_code": "PCM500",
+      "unit": "tablet",
+      "unit_prefix": "strip",
+      "prefix_qty": 10,
+      "catcode": "3",
+      "package_count": 1,
+      "reorder_level": 20,
+      "mrp": "50.00",
+      "sell_discount": "5.00",
+      "location1": "Rack A",
+      "location2": "Shelf 2",
+      "hsn_code": "3004",
+      "description": "Pain relief",
+      "dosage": "Twice daily",
+      "ingredients": "Paracetamol 500mg",
+      "status": "in stock",
+      "media": {
+        "img1": "http://127.0.0.1:8000/media/medicine_images/abc.jpg",
+        "img2": null,
+        "img3": null,
+        "img4": null,
+        "video": null
+      }
+    }
+  ]
+
+  If the category has no medicines, the response is an empty array [].
+
+
+Supplier API (Django REST Framework)
 
 Base URL
   /api/
 
 Endpoints
-  GET    /api/purchase-bills/              List purchase bills
-  POST   /api/purchase-bills/              Create purchase bill
-  GET    /api/purchase-bills/{id}/         Retrieve purchase bill
-  PUT    /api/purchase-bills/{id}/         Update purchase bill (full)
-  PATCH  /api/purchase-bills/{id}/         Update purchase bill (partial)
-  DELETE /api/purchase-bills/{id}/         Delete purchase bill
+  GET    /api/suppliers/              List suppliers
+  POST   /api/suppliers/              Create supplier
+  GET    /api/suppliers/{id}/         Retrieve supplier
+  PUT    /api/suppliers/{id}/         Update supplier (full)
+  PATCH  /api/suppliers/{id}/         Update supplier (partial)
+  DELETE /api/suppliers/{id}/         Delete supplier
 
-Model Fields (PurchaseBill)
-  supplier_name  (string, required)
-  date           (date, required; format: YYYY-MM-DD)
-  lr_no          (string, optional)
-  bill_number    (string, optional)
-  items          (array of child objects, optional; see below)
+Model Fields
+  supplier_code (string, read-only; auto-generated when creating, format: SUPyymmddXXXX)
+  name          (string, required)
+  position      (string, optional)
+  company       (string, optional)
+  address       (text, optional)
+  post          (string, optional)
+  pin           (string, optional)
+  district      (string, optional)
+  state         (string, optional)
+  country       (string, optional)
+  mob           (string, optional)
+  email         (string, optional; valid email format)
 
-Child Table (PurchaseBillItem - nested in items array)
-  medicine_name    (string, required)
-  qty              (integer, optional; default: 1)
-  batch_no         (string, optional)
-  gst              (decimal, optional)
-  purchasing_amount (decimal, required)
-  remarks          (text, optional)
-
-Example: Create Purchase Bill (JSON)
-  POST /api/purchase-bills/
+Example: Create Supplier (JSON)
+  POST /api/suppliers/
   Content-Type: application/json
 
   {
-    "supplier_name": "ABC Pharma Ltd",
-    "date": "2026-02-14",
-    "lr_no": "LR123456",
-    "bill_number": "BILL-2026-001",
+    "name": "John Doe",
+    "position": "Sales Manager",
+    "company": "ABC Pharma Ltd",
+    "address": "MG Road, Building 5",
+    "post": "MG Road",
+    "pin": "682001",
+    "district": "Ernakulam",
+    "state": "Kerala",
+    "country": "India",
+    "mob": "9876543210",
+    "email": "john@abcpharma.com"
+  }
+
+
+Purchase Order API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoints
+  GET    /api/purchase-orders/              List purchase orders
+  POST   /api/purchase-orders/              Create purchase order
+  GET    /api/purchase-orders/{id}/         Retrieve purchase order
+  PUT    /api/purchase-orders/{id}/         Update purchase order (full)
+  PATCH  /api/purchase-orders/{id}/         Update purchase order (partial)
+  DELETE /api/purchase-orders/{id}/         Delete purchase order
+
+Model Fields (PurchaseOrder)
+  purchase_order_no (string, read-only; auto-generated when creating, format: POyymmddXXXX)
+  date             (date, required; format: YYYY-MM-DD)
+  supplier         (integer, required; ID of supplier from /api/suppliers/)
+  supplier_code    (string, read-only; shown in response)
+  emp              (integer, optional; ID of staff/employee from /api/staff/)
+  emp_code         (string, read-only; shown in response)
+  status           (string, optional; choices: issued, partially delived, full delived; default: issued)
+  remarks          (text, optional)
+  items            (array of child objects, optional; see below)
+
+Child Table (PurchaseOrderItem - nested in items array)
+  item_code      (string, optional)
+  sku_code        (string, optional)
+  sku_name        (string, optional)
+  item_type       (string, optional; exactly one of: "p&p" or "shedule1")
+  unit            (string, optional)
+  full_quantity   (integer, optional; default: 0)
+  actual_quantity (integer, optional; default: 0)
+
+  Note: item_type has only two allowed values: p&p (P&P) and shedule1 (Shedule1).
+
+Example: Create Purchase Order (JSON)
+  POST /api/purchase-orders/
+  Content-Type: application/json
+
+  {
+    "date": "2026-02-18",
+    "supplier": 1,
+    "emp": 1,
+    "status": "issued",
+    "remarks": "Urgent order",
     "items": [
       {
-        "medicine_name": "Paracetamol 500mg",
-        "qty": 100,
-        "batch_no": "BATCH001",
-        "gst": 5.00,
-        "purchasing_amount": 250.00,
-        "remarks": "Urgent delivery"
-      },
-      {
-        "medicine_name": "Amoxicillin 250mg",
-        "qty": 50,
-        "batch_no": "BATCH002",
-        "gst": 5.00,
-        "purchasing_amount": 450.00,
-        "remarks": null
+        "item_code": "MED001",
+        "sku_code": "SKU-PARA-500",
+        "sku_name": "Paracetamol 500mg",
+        "item_type": "p&p",
+        "unit": "Strip",
+        "full_quantity": 100,
+        "actual_quantity": 100
       }
     ]
   }
 
-Example: Create Purchase Bill (minimal, without items)
-  POST /api/purchase-bills/
+
+Cart API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoints
+  GET    /api/carts/               List carts
+  POST   /api/carts/               Add to cart (creates cart with order_no)
+  GET    /api/carts/{id}/          Retrieve cart
+  PUT    /api/carts/{id}/          Update cart (full)
+  PATCH  /api/carts/{id}/          Update cart (partial)
+  DELETE /api/carts/{id}/          Delete cart
+
+Model Fields
+  order_no        (string, read-only; auto-generated when creating, format: ORDyymmddXXXX)
+  date            (date; defaults to current date on create)
+  time            (time; defaults to current time on create)
+  ccode           (string, optional; customer code, NULL or provided value)
+  inv_no          (string, optional; invoice number, NULL)
+  total_amount    (decimal, optional; default 0)
+  courier_amount  (decimal, optional; default 0)
+  net_amount      (decimal, optional; default 0)
+  despatch_no     (string, optional; NULL)
+  courier         (string, optional; NULL)
+  delivery_status (string; default 'CART')
+
+Notes
+  - When you POST to create a cart (add to cart), order_no is generated in the backend.
+  - date and time are set to current date and current time if not provided.
+
+Example: Add to cart (POST – minimal)
+  POST /api/carts/
+  Content-Type: application/json
+
+  {}
+
+  Response (201): order_no, date, time, ccode=null, inv_no=null, total_amount=0,
+  courier_amount=0, net_amount=0, despatch_no=null, courier=null, delivery_status='CART'
+
+Example: Add to cart (POST – with ccode)
+  POST /api/carts/
   Content-Type: application/json
 
   {
-    "supplier_name": "XYZ Medicals",
-    "date": "2026-02-14"
+    "ccode": "CUST2603141234"
+  }
+
+Example: List carts (GET)
+  GET /api/carts/
+
+
+Coupon API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoints
+  GET    /api/coupons/               List coupons
+  POST   /api/coupons/               Create coupon
+  GET    /api/coupons/{id}/          Retrieve coupon
+  PUT    /api/coupons/{id}/          Update coupon (full)
+  PATCH  /api/coupons/{id}/          Update coupon (partial)
+  DELETE /api/coupons/{id}/          Delete coupon
+
+Model Fields
+  name          (string, required) – coupon name or code
+  promo_start   (date, optional, format: YYYY-MM-DD) – start date of promo
+  promo_end     (date, optional, format: YYYY-MM-DD) – end date of promo
+  discount_pct  (decimal, required) – percentage discount (e.g. 5.00 for 5%)
+  status        (string, optional; choices: active, inactive; default: active)
+  type          (string, optional; choices: existing, new; default: new)
+
+Example: Create Coupon (JSON)
+  POST /api/coupons/
+  Content-Type: application/json
+
+  {
+    "name": "NEWUSER5",
+    "promo_start": "2026-03-01",
+    "promo_end": "2026-03-31",
+    "discount_pct": 5.00,
+    "status": "active",
+    "type": "new"
+  }
+
+Example: List Coupons (GET)
+  GET /api/coupons/
+
+
+Add Item to Cart API
+
+Endpoint
+  POST   /api/cart/item/add/              Add or update item in cart
+
+Input (JSON)
+  order_no   (string, required) – Cart order number (from Cart API)
+  mcode      (string, required) – Medical item code (must exist in medical item master / MedicalItem.mcode)
+  qty        (integer, required; min 1) – Quantity
+
+Logic
+  - Rate is fetched from medical item master (MedicalItem): mcode is matched to MedicalItem.mcode; rate = MedicalItem.mrp (or 0 if null), minus sell_discount%.
+  - If a line already exists for this order_no + mcode, qty is updated; otherwise a new line is inserted in online_order_items (item_code stores the mcode value).
+  - amt = qty × rate; stored with the line.
+
+Response (200 OK)
+  message   ("Item added to cart." or "Updated item in cart.")
+  item      { id, cart, mcode, qty, rate, amt }  (mcode is the medical item code)
+
+Errors
+  - 404 if cart with order_no not found.
+  - 404 if product with item_code not found in product master (Item).
+
+Example: Add item to cart
+  POST /api/cart/item/add/
+  Content-Type: application/json
+
+  {
+    "order_no": "ORD2603221234",
+    "mcode": "1",
+    "qty": 2
+  }
+
+
+Increment Cart Item API
+
+Endpoint
+  POST   /api/cart/item/increment/       Increase quantity of an item in cart by 1
+
+Input (JSON)
+  order_no   (string, required) – Cart order number
+  mcode      (string, required) – Medical item code of the line in cart
+
+Logic
+  - Finds cart by order_no and line by item_code; increases qty by 1; amt = qty × rate.
+
+Response (200 OK)
+  message   ("Item quantity increased.")
+  item      { id, cart, mcode, qty, rate, amt }
+
+Errors
+  - 404 if cart not found or item not in cart.
+
+Example: Increment item in cart
+  POST /api/cart/item/increment/
+  Content-Type: application/json
+
+  {
+    "order_no": "ORD2603221234",
+    "mcode": "1"
+  }
+
+
+Decrement Cart Item API
+
+Endpoint
+  POST   /api/cart/item/decrement/       Decrease quantity of an item in cart by 1 (minimum 1)
+
+Input (JSON)
+  order_no   (string, required) – Cart order number
+  mcode      (string, required) – Medical item code of the line in cart
+
+Logic
+  - Finds cart by order_no and line by item_code; decreases qty by 1 (not below 1); amt = qty × rate.
+  - To remove the item entirely, use the delete API.
+
+Response (200 OK)
+  message   ("Item quantity decreased.")
+  item      { id, cart, mcode, qty, rate, amt }
+
+Errors
+  - 404 if cart not found or item not in cart.
+  - 400 if qty is already 1 (use delete API to remove).
+
+Example: Decrement item in cart
+  POST /api/cart/item/decrement/
+  Content-Type: application/json
+
+  {
+    "order_no": "ORD2603221234",
+    "mcode": "1"
+  }
+
+
+Delete Cart Item API
+
+Endpoint
+  POST   /api/cart/item/delete/          Remove an item from cart
+
+Input (JSON)
+  order_no   (string, required) – Cart order number
+  mcode      (string, required) – Medical item code of the line in cart
+
+Logic
+  - Finds cart by order_no and line by item_code; deletes the line.
+
+Response (200 OK)
+  message   ("Item removed from cart.")
+
+Errors
+  - 404 if cart not found or item not in cart.
+
+Example: Delete item from cart
+  POST /api/cart/item/delete/
+  Content-Type: application/json
+
+  {
+    "order_no": "ORD2603221234",
+    "item_code": "PCM500"
+  }
+
+
+User Register API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoints
+  GET    /api/auth/register/              Get current user's registration details
+  POST   /api/auth/register/              Register a new user
+
+GET Request
+  Authentication: Required. Send header: Authorization: Token <token>
+
+  Returns the registration details for the currently logged-in user.
+
+GET Response (200 OK)
+  customer_code  (string) – Customer code for this user (e.g. CUST2603141234)
+  name           (string) – Name from UserProfile
+  email          (string) – Email from User
+  phone          (string) – Phone from UserProfile (or username fallback)
+  username       (string) – Username used for login (mobile number)
+
+GET Errors
+  - 401 if authentication credentials are not provided.
+  - 404 if UserProfile does not exist for this user (should not happen for normal registered users).
+
+Example: Get current user's registration details
+  GET /api/auth/register/
+  Authorization: Token <your-token>
+
+  Response:
+  {
+    "customer_code": "CUST2603141234",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9876543210",
+    "username": "9876543210"
+  }
+
+POST Request Body (JSON)
+  name         (string, required)
+  email        (string, required; valid email; must be unique)
+  phone        (string, required; mobile number; used as username for login; must be unique)
+              OR use one of: mobile, mobileNumber, phoneNumber (all map to phone)
+
+  Note: Password is auto-generated by the backend. A customer_code is generated
+        on registration (format: CUSTyymmddXXXX, e.g. CUST2603141234). Username and
+        password are sent to the user's email and mobile number (SMS). They are also
+        returned in the response. Username for login is the mobile number (phone).
+        The user can change password later via forgot-password / reset-password.
+
+Response (201 Created)
+  message, customer_code (auto-generated; e.g. CUST2603141234), username (mobile number),
+  email, password (auto-generated; use with username to login), token, email_sent
+
+Example: Register (using "phone")
+  POST /api/auth/register/
+  Content-Type: application/json
+
+  {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9876543210"
+  }
+
+Example: Register (using "mobile" - also accepted)
+  POST /api/auth/register/
+  Content-Type: application/json
+
+  {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "mobile": "9876543210"
+  }
+
+
+Identify Customer API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/identify-customer/      Identify if a mobileNumber belongs to an existing customer
+
+Request Body (JSON)
+  mobileNumber   (string, required; mobile number to check)
+
+Behavior
+  - If no user exists with this mobile number (username), returns:
+      { "status": "NEW_CUSTOMER" }
+  - If a user exists with this mobile number, returns:
+      {
+        "status": "EXISTING_CUSTOMER",
+        "customer_code": "CUST2603141234",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "phone": "9876543210",
+        "username": "9876543210"
+      }
+
+Response (200 OK)
+  status         (string) – "NEW_CUSTOMER" or "EXISTING_CUSTOMER"
+  customer_code  (string, only when EXISTING_CUSTOMER)
+  name           (string, only when EXISTING_CUSTOMER)
+  email          (string, only when EXISTING_CUSTOMER)
+  phone          (string, only when EXISTING_CUSTOMER)
+  username       (string, only when EXISTING_CUSTOMER)
+
+Example: New customer
+  POST /api/auth/identify-customer/
+  Content-Type: application/json
+
+  {
+    "mobileNumber": "9999999999"
+  }
+
+  Response:
+  {
+    "status": "NEW_CUSTOMER"
+  }
+
+Example: Existing customer
+  POST /api/auth/identify-customer/
+  Content-Type: application/json
+
+  {
+    "mobileNumber": "9876543210"
+  }
+
+  Response:
+  {
+    "status": "EXISTING_CUSTOMER",
+    "customer_code": "CUST2603141234",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9876543210",
+    "username": "9876543210"
+  }
+
+
+Send OTP API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/send-otp/               Generate and store an OTP for mobileNumber/email
+
+Request Body (JSON)
+  mobileNumber   (string, required; mobile number to send OTP for)
+  email          (string, required; email to associate with the OTP)
+
+Behavior
+  - Generates a 6-digit numeric OTP and stores it in the database (OneTimePassword model).
+  - The OTP is valid for 5 minutes by default (300 seconds).
+  - The OTP itself is NOT returned in the response; instead a reference ID and expiry are returned.
+
+Response (200 OK)
+  status          (string) – "OTP_SENT"
+  otpReferenceId  (string) – Reference ID for the generated OTP (e.g. "OTP000123")
+  channels        (array)  – Channels used/available for OTP (["EMAIL", "SMS"])
+  expiryInSeconds (number) – Time-to-live in seconds (e.g. 300)
+
+Example: Send OTP
+  POST /api/auth/send-otp/
+  Content-Type: application/json
+
+  {
+    "mobileNumber": "9876543210",
+    "email": "newuser@example.com"
+  }
+
+  Response:
+  {
+    "status": "OTP_SENT",
+    "otpReferenceId": "OTP000123",
+    "channels": ["EMAIL", "SMS"],
+    "expiryInSeconds": 300
+  }
+
+
+Verify OTP API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/verify-otp/              Verify an OTP using reference ID and code
+
+Request Body (JSON)
+  otpReferenceId   (string, required; value returned from Send OTP, e.g. "OTP000123")
+  otp              (string, required; 6-digit OTP code entered by the user)
+
+Behavior
+  - Looks up the OTP record using otpReferenceId.
+  - Validates that:
+      * The OTP exists.
+      * The OTP is not expired and has not already been used.
+      * The code matches the stored OTP.
+  - Determines whether this is a new customer:
+      * isNewCustomer = true if no User exists with username = mobileNumber used for the OTP.
+      * isNewCustomer = false otherwise.
+  - Generates a customerCode if needed (format: CUSTyymmddXXXX, e.g. CUST2603141234) and stores it on the OTP record.
+  - Returns an auth token for both new and existing customers. For new customers, a User and UserProfile are created so a token can be issued.
+
+Response (200 OK)
+  status         (string) – "OTP_VERIFIED"
+  customerCode   (string) – Generated or existing customer code (e.g. "CUST000456")
+  isNewCustomer  (boolean) – true if no existing user with this mobile number, false otherwise
+  token          (string) – Auth token; use in header Authorization: Token <token> for protected APIs
+
+Errors
+  - 400 if otpReferenceId format is invalid.
+  - 400 if OTP not found.
+  - 400 if OTP has expired or already been used.
+  - 400 if the OTP code does not match.
+
+Example: Verify OTP
+  POST /api/auth/verify-otp/
+  Content-Type: application/json
+
+  {
+    "otpReferenceId": "OTP000123",
+    "otp": "123456"
+  }
+
+  Response (new customer – isNewCustomer: true):
+  {
+    "status": "OTP_VERIFIED",
+    "customerCode": "CUST000456",
+    "isNewCustomer": true,
+    "token": "63fc097018cc71cfbbf91263083f3fd0884c1e41"
+  }
+
+  Response (existing customer – isNewCustomer: false):
+  {
+    "status": "OTP_VERIFIED",
+    "customerCode": "CUST000123",
+    "isNewCustomer": false,
+    "token": "a91cc70911b2a02d1f4b5e6c88"
+  }
+
+
+Customer Address API
+
+Base URL
+  /api/
+
+Endpoints
+  GET   /api/customer/address/            Get address for a customer
+  POST  /api/customer/address/            Create or update address for a customer
+
+Recommended (after login): use Authorization header. Customer code is taken from the backend;
+  the frontend does NOT send or store customer_code for add/get address.
+
+Authentication (optional)
+  If you send: Authorization: Token <token>
+  - GET: returns the logged-in user's address (no query params needed).
+  - POST: body does NOT include customer_code; backend uses logged-in user's profile.
+
+GET Request
+  With token (recommended):
+    No query parameters. Returns address for the logged-in user.
+  Without token:
+    customer_code   (string, required) – Customer code from Register API (e.g. CUST2603141234)
+
+Response (200 OK)
+  {
+    "id": 1,
+    "customer_code": "CUST2603141234",
+    "name": "John Doe",
+    "prefix": "Mr",
+    "address": "House name, Street",
+    "post": "Some Post",
+    "district": "Some District",
+    "state": "Some State",
+    "pin": "123456",
+    "country": "India"
+  }
+
+Errors
+  - 400 if customer_code is missing (when not authenticated).
+  - 403 if authenticated but user has no profile or no customer_code ("Customer code not found. Please log in again or contact support.").
+  - 404 if customer or address not found.
+
+POST Request (authenticated – recommended after login)
+  Headers: Authorization: Token <your-token>
+  Body (JSON) – do NOT send customer_code:
+    name      (string, optional) – Full name of the recipient
+    prefix    (string, required) – One of: "Mr", "Mrs", "Miss", "Adv", "Dr"
+    address   (string, required) – Full address line
+    post      (string, required)
+    district  (string, required)
+    state     (string, required)
+    pin       (string, required)
+    country   (string, required)
+
+POST Request (without token)
+  Body (JSON):
+    customer_code   (string, required) – Customer code from Register API
+    name            (string, optional) – Full name of the recipient
+    prefix          (string, required) – One of: "Mr", "Mrs", "Miss", "Adv", "Dr"
+    address         (string, required) – Full address line
+    post            (string, required)
+    district        (string, required)
+    state           (string, required)
+    pin             (string, required)
+    country         (string, required)
+
+Logic
+  - If authenticated: customer_code is taken from backend (request.user.profile.customer_code).
+  - If not authenticated: customer_code must be sent in body (POST) or query (GET).
+  - Creates a new address if none exists, or updates existing address for that customer.
+
+Example: Create / update address (after login – no customer_code)
+  POST /api/customer/address/
+  Authorization: Token <your-token>
+  Content-Type: application/json
+
+  {
+    "name": "John Doe",
+    "prefix": "Mr",
+    "address": "ABC House, Main Road",
+    "post": "Town Post",
+    "district": "Some District",
+    "state": "Kerala",
+    "pin": "680001",
+    "country": "India"
+  }
+
+Example: Create / update address (without token)
+  POST /api/customer/address/
+  Content-Type: application/json
+
+  {
+    "customer_code": "CUST2603141234",
+    "name": "John Doe",
+    "prefix": "Mr",
+    "address": "ABC House, Main Road",
+    "post": "Town Post",
+    "district": "Some District",
+    "state": "Kerala",
+    "pin": "680001",
+    "country": "India"
+  }
+
+
+Confirm Order API
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/orders/confirm/              Confirm cart as order (authenticated)
+
+Authentication
+  Required: Token. Send header: Authorization: Token <your-token>
+
+Request Body (JSON)
+  order_no     (string, required) – Cart order number (e.g. ORD2603221234)
+  address_id   (integer, required) – ID of CustomerAddress belonging to the logged-in user
+  payment_mode (string, required) – One of: COD, ONLINE, CARD, UPI
+
+  Frontend does NOT send totals or ccode; backend recalculates and sets them.
+
+Backend Logic (step-by-step)
+  1. Authenticate user (Token).
+  2. Fetch cart by order_no and delivery_status = CART.
+  3. Ensure cart belongs to logged-in customer (cart.ccode empty or equal to user's customer_code).
+  4. Ensure cart has at least one item.
+  5. Ensure address_id belongs to the logged-in user (CustomerAddress.profile = user's profile).
+  6. Recalculate: total_amount (from items minus discount), courier_amount (0), net_amount.
+  7. Generate unique inv_no (e.g. INV2603220007).
+  8. Update cart: inv_no, delivery_status = ORDERED, total_amount, courier_amount, net_amount, ccode, payment_mode.
+  9. Return confirmation.
+
+Response (201 Created)
+  {
+    "message": "Order confirmed successfully",
+    "order_no": "ORD2603221234",
+    "invoice_no": "INV2603220007",
+    "total_amount": 2240,
+    "courier_amount": 0,
+    "net_amount": 2240,
+    "payment_mode": "COD",
+    "delivery_status": "ORDERED"
+  }
+
+Errors
+  - 401 if not authenticated.
+  - 403 if user has no profile/customer_code, or cart belongs to another customer, or address does not belong to user.
+  - 404 if cart not found or already confirmed, or address not found.
+  - 400 if cart has no items.
+
+Example: Confirm order
+  POST /api/orders/confirm/
+  Authorization: Token <your-token>
+  Content-Type: application/json
+
+  {
+    "order_no": "ORD2603221234",
+    "address_id": 15,
+    "payment_mode": "COD"
+  }
+
+
+Admin Orders API
+
+Base URL
+  /api/
+
+Endpoints
+  GET   /api/admin/orders/                List all orders (confirmed orders only; excludes CART)
+  GET   /api/admin/orders/{order_id}/     Get order details by order_id
+
+List all orders
+  GET   /api/admin/orders/
+
+  Used by Admin Dashboard → Orders list. Returns only confirmed orders (delivery_status != 'CART', order_no set).
+
+  Query parameters (optional)
+    status   – Filter by delivery_status (e.g. ?status=ordered)
+
+  Response (200 OK)
+    count    (number) – Total number of orders returned
+    results  (array) – List of order summaries, each with:
+      order_id        (string) – Order number (order_no)
+      cart_id         (number) – Cart primary key
+      order_date      (string) – ISO date-time or date
+      order_status    (string) – delivery_status (e.g. ordered)
+      payment_status  (string) – "paid" or "pending"
+      payment_method  (string) – e.g. cod, online, or null
+      customer_id     (number or null) – UserProfile id
+      customer_name   (string)
+      item_count      (number)
+      final_total     (number)
+
+  Errors
+    - 401 if not authenticated.
+
+  Example: List all orders
+    GET /api/admin/orders/
+    Authorization: Token <your-token>
+
+  Example: List orders by status
+    GET /api/admin/orders/?status=ordered
+    Authorization: Token <your-token>
+
+  Example response
+    {
+      "count": 2,
+      "results": [
+        {
+          "order_id": "ORD2602230398",
+          "cart_id": 3,
+          "order_date": "2026-02-20T14:32:10",
+          "order_status": "ordered",
+          "payment_status": "paid",
+          "payment_method": "cod",
+          "customer_id": 7,
+          "customer_name": "John Doe",
+          "item_count": 3,
+          "final_total": 6600.0
+        }
+      ]
+    }
+
+  Testing /api/admin/orders/ (token and credentials)
+    To get a valid token and credentials on your machine, run:
+      cd <project-root>
+      python manage.py create_test_token
+
+    This creates (or updates) a test user and prints:
+    - username and password (use these in POST /api/auth/login/ to get a token)
+    - a Token you can use directly in the Authorization header
+
+    Default test credentials (after running create_test_token):
+      username: admintest
+      password: TestAdmin123!
+
+    To get a token via login:
+      POST /api/auth/login/
+      Content-Type: application/json
+      { "username": "admintest", "password": "TestAdmin123!" }
+      Response includes: "token": "<use-this-in-Authorization-header>"
+
+    Example: List orders with token (replace <token> with the value from login or create_test_token)
+      GET /api/admin/orders/
+      Authorization: Token <token>
+
+    Example (curl):
+      curl -H "Authorization: Token <your-token>" http://localhost:8000/api/admin/orders/
+
+
+Get order details (by order_id)
+  GET   /api/admin/orders/{order_id}/
+
+  Used by Admin Dashboard → Order Details page.
+
+  URL
+    order_id   – Cart primary key (integer, e.g. 3) or order_no (string, e.g. ORD2602230398)
+
+  Response (200 OK)
+    order_id        (string) – Order number (cart order_no)
+    order_date      (string) – ISO date-time (e.g. 2026-02-20T14:32:10)
+    order_status    (string) – delivery_status (e.g. ordered, cart)
+    payment_status  (string) – "paid" or "pending"
+    payment_method  (string) – e.g. cod, online
+
+    customer        (object)
+      customer_id   (number) – UserProfile id
+      name          (string)
+      phone         (string)
+      email         (string)
+
+    addresses       (object)
+      shipping      (object) – full_name, phone, address_line1, address_line2, city, state, postal_code, country
+      billing       (object) – same as shipping (single address stored)
+
+    items           (array)
+      order_item_id (number)
+      product_id    (number or null)
+      product_name  (string)
+      variant       (object) – empty {} (no size/color in current model)
+      quantity      (number)
+      price         (number)
+      subtotal      (number)
+
+    summary         (object)
+      subtotal      (number)
+      tax           (number) – 0
+      shipping_fee  (number)
+      discount      (number)
+      coupon_code   (null)
+      final_total   (number)
+
+  Errors
+    - 401 if not authenticated.
+    - 404 if order_id (cart id or order_no) not found.
+
+  Example: Get order details (by order_no)
+    GET /api/admin/orders/ORD2602230398/
+    Authorization: Token <your-token>
+
+  Example: Get order details (by cart id)
+    GET /api/admin/orders/3/
+    Authorization: Token <your-token>
+
+  Example response
+    {
+      "order_id": "ORD2602230398",
+      "order_date": "2026-02-20T14:32:10",
+      "order_status": "ordered",
+      "payment_status": "paid",
+      "payment_method": "cod",
+      "customer": {
+        "customer_id": 7,
+        "name": "John Doe",
+        "phone": "9876543210",
+        "email": "john@example.com"
+      },
+      "addresses": {
+        "shipping": {
+          "full_name": "Mr John Doe",
+          "phone": "9876543210",
+          "address_line1": "123 Main Street",
+          "address_line2": "",
+          "city": "Thrissur",
+          "state": "Kerala",
+          "postal_code": "680001",
+          "country": "India"
+        },
+        "billing": { ... same as shipping ... }
+      },
+      "items": [
+        {
+          "order_item_id": 10,
+          "product_id": 5,
+          "product_name": "Paracetamol",
+          "variant": {},
+          "quantity": 2,
+          "price": 100.0,
+          "subtotal": 200.0
+        }
+      ],
+      "summary": {
+        "subtotal": 6600.0,
+        "tax": 0.0,
+        "shipping_fee": 0.0,
+        "discount": 0.0,
+        "coupon_code": null,
+        "final_total": 6600.0
+      }
+    }
+
+
+Admin Login API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/admin/login/                Admin login with username and password (returns auth token)
+
+Authentication
+  Not required for this endpoint. Use the returned token in the Authorization header for admin APIs (e.g. GET /api/admin/orders/).
+
+Request Body (JSON)
+  username   (string, required)
+  password   (string, required)
+
+  Only users with staff or superuser privileges can log in via this endpoint. Regular customers should use POST /api/auth/login/.
+
+Response (200 OK)
+  message   (string) – e.g. "Admin login successful."
+  token     (string) – Use in header: Authorization: Token <token>
+  username  (string)
+
+Response (401 Unauthorized)
+  error: "Invalid username or password."
+
+Response (403 Forbidden)
+  error: "Access denied. Admin privileges required."
+  (when username/password are correct but user is not staff or superuser)
+
+Example: Admin Login
+  POST /api/admin/login/
+  Content-Type: application/json
+
+  {
+    "username": "admin",
+    "password": "your-admin-password"
+  }
+
+Example response (200 OK)
+  {
+    "message": "Admin login successful.",
+    "token": "a1b2c3d4e5f6...",
+    "username": "admin"
+  }
+
+  Use the token for subsequent admin API calls:
+    GET /api/admin/orders/
+    Authorization: Token <token>
+
+
+Register Delete API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/register-delete/      Delete the authenticated user's account
+
+Authentication
+  Required: Token. Send header: Authorization: Token <your-token>
+
+Request Body (JSON)
+  password (string, optional; if provided, must match current password to confirm deletion)
+
+Response (200 OK)
+  message: "Your account has been deleted successfully."
+
+Response (400 Bad Request)
+  error: "Invalid password. Provide correct password to delete account."
+  (when password is provided but does not match)
+
+Response (401 Unauthorized)
+  When Authorization header is missing or token is invalid.
+
+Example: Delete account (with password confirmation)
+  POST /api/auth/register-delete/
+  Authorization: Token a849f1db713344501efeaf9dee4738286c2f4ae7
+  Content-Type: application/json
+
+  {
+    "password": "RXFUyUgah2BZ"
+  }
+
+Example: Delete account (no password in body; token only)
+  POST /api/auth/register-delete/
+  Authorization: Token a849f1db713344501efeaf9dee4738286c2f4ae7
+  Content-Type: application/json
+
+  {}
+
+
+Login API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/login/                 Login with username and password
+
+Request Body (JSON)
+  username (string, required; use mobile number (phone) as username)
+  password (string, required)
+
+Response (200 OK)
+  message, token, username
+
+Response (401 Unauthorized)
+  error: "Invalid username or password."
+
+Example: Login
+  POST /api/auth/login/
+  Content-Type: application/json
+
+  {
+    "username": "9876543210",
+    "password": "<password-from-register-response>"
+  }
+
+
+Forgot Password API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/forgot-password/       Request a password reset token
+
+Request Body (JSON)
+  email (string, required; valid email)
+
+Response (200 OK)
+  message, token (use this token in verify-password and reset-password)
+
+Example: Forgot Password
+  POST /api/auth/forgot-password/
+  Content-Type: application/json
+
+  {
+    "email": "john@example.com"
+  }
+
+
+Verify Password (Token) API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/verify-password/       Verify that a reset token is valid
+
+Request Body (JSON)
+  token (string, required; token received from forgot-password)
+
+Response (200 OK)
+  valid (boolean): true if token is valid and not expired, false otherwise
+
+Example: Verify Token
+  POST /api/auth/verify-password/
+  Content-Type: application/json
+
+  {
+    "token": "<token-from-forgot-password-response>"
+  }
+
+
+Reset Password API (Django REST Framework)
+
+Base URL
+  /api/
+
+Endpoint
+  POST   /api/auth/reset-password/        Set new password using reset token
+
+Request Body (JSON)
+  token        (string, required; token from forgot-password)
+  new_password (string, required; new password)
+
+Response (200 OK)
+  message: "Password has been reset successfully."
+
+Response (400 Bad Request)
+  error: "Invalid or expired token."
+
+Example: Reset Password
+  POST /api/auth/reset-password/
+  Content-Type: application/json
+
+  {
+    "token": "<token-from-forgot-password-response>",
+    "new_password": "NewSecurePass456"
   }
